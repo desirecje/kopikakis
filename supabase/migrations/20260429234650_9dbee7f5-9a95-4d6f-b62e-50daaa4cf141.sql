@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "public insert signups" ON public.session_signups;

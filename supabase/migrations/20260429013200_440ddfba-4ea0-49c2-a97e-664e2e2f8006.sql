@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS trg_assign_queue_number ON public.orders;
