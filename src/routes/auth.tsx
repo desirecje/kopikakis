@@ -24,22 +24,29 @@ function AuthPage() {
     if (!loading && session && !justVerified) navigate({ to: "/home" });
   }, [loading, session, navigate, justVerified]);
 
-  const sendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: undefined,
-        data: { display_name: email.split("@")[0] },
-      },
-    });
-    setBusy(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("6-digit code sent! Check your email.");
-    setStage("code");
-  };
+const sendCode = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  // Restrict to NUS emails only
+  if (!email.endsWith("@u.nus.edu")) {
+    toast.error("Only NUS student emails (@u.nus.edu) are allowed.");
+    return;
+  }
+
+  setBusy(true);
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: true,
+      emailRedirectTo: undefined,
+      data: { display_name: email.split("@")[0] },
+    },
+  });
+  setBusy(false);
+  if (error) { toast.error(error.message); return; }
+  toast.success("6-digit code sent! Check your email.");
+  setStage("code");
+};
 
   const verifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
