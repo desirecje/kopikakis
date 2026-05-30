@@ -39,28 +39,28 @@ function ProfileSetupPage() {
     setForm((f) => ({ ...f, [key]: value }));
   };
 
-  const saveProfile = async () => {
-    if (!session?.user) return;
-    setSaving(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        display_name: form.display_name,
-        faculty: form.faculty,
-        course: form.course,
-        year_of_study: form.year_of_study,
-        accommodation: form.accommodation,
-        study_style: form.study_style,
-        telegram_handle: form.telegram_handle,
-        bio: form.bio,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", session.user.id);
-    setSaving(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Profile saved!");
-    navigate({ to: "/home" });
-  };
+const saveProfile = async () => {
+  if (!session?.user) return;
+  setSaving(true);
+  const { error } = await supabase
+    .from("profiles")
+    .upsert({
+      id: session.user.id,        // ← add this line
+      display_name: form.display_name,
+      faculty: form.faculty,
+      course: form.course,
+      year_of_study: form.year_of_study,
+      accommodation: form.accommodation,
+      study_style: form.study_style,
+      telegram_handle: form.telegram_handle,
+      bio: form.bio,
+      updated_at: new Date().toISOString(),
+    });
+  setSaving(false);
+  if (error) { toast.error(error.message); return; }
+  toast.success("Profile saved!");
+  navigate({ to: "/home" });
+};
 
   if (loading) return null;
 
