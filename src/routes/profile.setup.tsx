@@ -31,36 +31,61 @@ function ProfileSetupPage() {
     bio: "",
   });
 
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading && !session) navigate({ to: "/auth" });
   }, [loading, session, navigate]);
+
+  // Pre-fill form with existing profile data for returning users
+  useEffect(() => {
+    if (!session?.user) return;
+    supabase
+      .from("profiles")
+      .select("display_name, faculty, course, year_of_study, accommodation, study_style, telegram_handle, bio")
+      .eq("id", session.user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setForm({
+            display_name: data.display_name ?? "",
+            faculty: data.faculty ?? "",
+            course: data.course ?? "",
+            year_of_study: data.year_of_study ?? "",
+            accommodation: data.accommodation ?? "",
+            study_style: data.study_style ?? "",
+            telegram_handle: data.telegram_handle ?? "",
+            bio: data.bio ?? "",
+          });
+        }
+      });
+  }, [session]);
 
   const update = (key: string, value: string) => {
     setForm((f) => ({ ...f, [key]: value }));
   };
 
-const saveProfile = async () => {
-  if (!session?.user) return;
-  setSaving(true);
-  const { error } = await supabase
-    .from("profiles")
-    .upsert({
-      id: session.user.id,        // ← add this line
-      display_name: form.display_name,
-      faculty: form.faculty,
-      course: form.course,
-      year_of_study: form.year_of_study,
-      accommodation: form.accommodation,
-      study_style: form.study_style,
-      telegram_handle: form.telegram_handle,
-      bio: form.bio,
-      updated_at: new Date().toISOString(),
-    });
-  setSaving(false);
-  if (error) { toast.error(error.message); return; }
-  toast.success("Profile saved!");
-  navigate({ to: "/home" });
-};
+  const saveProfile = async () => {
+    if (!session?.user) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({
+        id: session.user.id,
+        display_name: form.display_name,
+        faculty: form.faculty,
+        course: form.course,
+        year_of_study: form.year_of_study,
+        accommodation: form.accommodation,
+        study_style: form.study_style,
+        telegram_handle: form.telegram_handle,
+        bio: form.bio,
+        updated_at: new Date().toISOString(),
+      });
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Profile saved!");
+    navigate({ to: "/home" });
+  };
 
   if (loading) return null;
 
@@ -98,7 +123,6 @@ const saveProfile = async () => {
 
           {step === 1 ? (
             <>
-              {/* Display name */}
               <Field label="Display name">
                 <input
                   className={inp}
@@ -108,7 +132,6 @@ const saveProfile = async () => {
                 />
               </Field>
 
-              {/* Faculty */}
               <Field label="Faculty">
                 <select className={inp} value={form.faculty} onChange={(e) => update("faculty", e.target.value)}>
                   <option value="">Select faculty</option>
@@ -116,7 +139,6 @@ const saveProfile = async () => {
                 </select>
               </Field>
 
-              {/* Course */}
               <Field label="Course / Major">
                 <input
                   className={inp}
@@ -126,7 +148,6 @@ const saveProfile = async () => {
                 />
               </Field>
 
-              {/* Year */}
               <Field label="Year of study">
                 <div className="flex gap-2 flex-wrap">
                   {YEARS.map((y) => (
@@ -157,7 +178,6 @@ const saveProfile = async () => {
             </>
           ) : (
             <>
-              {/* Accommodation */}
               <Field label="Accommodation (optional)">
                 <select className={inp} value={form.accommodation} onChange={(e) => update("accommodation", e.target.value)}>
                   <option value="">Select accommodation</option>
@@ -165,7 +185,6 @@ const saveProfile = async () => {
                 </select>
               </Field>
 
-              {/* Study style */}
               <Field label="Study style">
                 <div className="flex gap-2 flex-wrap">
                   {STUDY_STYLES.map((s) => (
@@ -185,7 +204,6 @@ const saveProfile = async () => {
                 </div>
               </Field>
 
-              {/* Telegram */}
               <Field label="Telegram handle">
                 <input
                   className={inp}
@@ -195,7 +213,6 @@ const saveProfile = async () => {
                 />
               </Field>
 
-              {/* Bio */}
               <Field label="Short bio (optional)">
                 <textarea
                   className={`${inp} min-h-[80px] resize-none`}
