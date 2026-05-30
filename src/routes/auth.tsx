@@ -1,4 +1,3 @@
-// src/pages/AuthPage.jsx
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
@@ -10,8 +9,7 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-// how long before user can resend (seconds)
-const RESEND_COOLDOWN = 60
+const RESEND_COOLDOWN = 60;
 
 function AuthPage() {
   const navigate = useNavigate();
@@ -21,45 +19,37 @@ function AuthPage() {
   const [stage, setStage] = useState<"email" | "code">("email");
   const [busy, setBusy] = useState(false);
   const [justVerified, setJustVerified] = useState(false);
-
-  // ── edit: resend cooldown ──────────────────────────────────
-  const [cooldown, setCooldown] = useState(0)  // seconds remaining
-  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // ── edit: auto-focus code input when stage changes ─────────
-  const codeInputRef = useRef<HTMLInputElement>(null)
+  const [cooldown, setCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading && session && !justVerified) navigate({ to: "/home" });
   }, [loading, session, navigate, justVerified]);
 
-  // auto-focus code input when we switch to code stage
   useEffect(() => {
     if (stage === "code") {
-      // small delay so the input is rendered before we focus it
-      setTimeout(() => codeInputRef.current?.focus(), 100)
+      setTimeout(() => codeInputRef.current?.focus(), 100);
     }
-  }, [stage])
+  }, [stage]);
 
-  // clean up interval on unmount
   useEffect(() => {
     return () => {
-      if (cooldownRef.current) clearInterval(cooldownRef.current)
-    }
-  }, [])
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, []);
 
-  // ── edited: starts the 60s countdown after sending a code ────
   function startCooldown() {
-    setCooldown(RESEND_COOLDOWN)
+    setCooldown(RESEND_COOLDOWN);
     cooldownRef.current = setInterval(() => {
       setCooldown((prev) => {
         if (prev <= 1) {
-          clearInterval(cooldownRef.current!)
-          return 0
+          clearInterval(cooldownRef.current!);
+          return 0;
         }
-        return prev - 1
-      })
-    }, 1000)
+        return prev - 1;
+      });
+    }, 1000);
   }
 
   const sendCode = async (e: React.FormEvent) => {
@@ -79,42 +69,40 @@ function AuthPage() {
     });
     setBusy(false);
     if (error) {
-      // edited: friendlier error for rate limiting 
       if (error.message.toLowerCase().includes("rate limit") ||
           error.message.toLowerCase().includes("too many")) {
-        toast.error("Too many attempts. Please wait a minute before trying again.")
+        toast.error("Too many attempts. Please wait a minute before trying again.");
       } else {
-        toast.error(error.message)
+        toast.error(error.message);
       }
-      return
+      return;
     }
     toast.success("6-digit code sent! Check your NUS email.");
     setStage("code");
-    startCooldown()  // start the countdown after first send
+    startCooldown();
   };
 
-  // ── edit: resend handler — same as sendCode but stays on code stage ──
   const resendCode = async () => {
-    if (cooldown > 0) return  // safety check
-    setBusy(true)
+    if (cooldown > 0) return;
+    setBusy(true);
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { shouldCreateUser: true, emailRedirectTo: undefined },
-    })
-    setBusy(false)
+    });
+    setBusy(false);
     if (error) {
       if (error.message.toLowerCase().includes("rate limit") ||
           error.message.toLowerCase().includes("too many")) {
-        toast.error("Too many attempts. Please wait a minute.")
+        toast.error("Too many attempts. Please wait a minute.");
       } else {
-        toast.error(error.message)
+        toast.error(error.message);
       }
-      return
+      return;
     }
-    toast.success("edit code sent!")
-    setCode("")  // clear old code from input
-    startCooldown()
-  }
+    toast.success("New code sent!");
+    setCode("");
+    startCooldown();
+  };
 
   const verifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,13 +172,10 @@ function AuthPage() {
               <p className="text-sm text-[#7A6A55] mb-1">
                 Sent to <span className="font-medium text-[#3A2410]">{email}</span>
               </p>
-              {/* ── edit: expiry hint ── */}
-              <p className="text-xs text-[#7A6A55] mb-5">
-                Code expires in 10 minutes.
-              </p>
+              <p className="text-xs text-[#7A6A55] mb-5">Code expires in 10 minutes.</p>
               <form onSubmit={verifyCode} className="flex flex-col gap-3">
                 <input
-                  ref={codeInputRef}   {/* ── edit: auto-focus ref ── */}
+                  ref={codeInputRef}
                   type="text"
                   required
                   inputMode="numeric"
@@ -208,8 +193,6 @@ function AuthPage() {
                 >
                   {busy ? "Verifying..." : "Verify & sign in →"}
                 </button>
-
-                {/* ── edit: resend button with countdown ── */}
                 <button
                   type="button"
                   onClick={resendCode}
@@ -218,7 +201,6 @@ function AuthPage() {
                 >
                   {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
                 </button>
-
                 <button
                   type="button"
                   onClick={() => { setStage("email"); setCode(""); }}
