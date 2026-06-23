@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BottomNav } from "./home";
+import { ModulePill } from "@/components/ModulePill";
 
 export const Route = createFileRoute("/profile/")({
   component: ProfilePage,
@@ -19,14 +20,9 @@ type Profile = {
   telegram_handle: string | null;
   bio: string | null;
   email: string | null;
+  avatar_url: string | null;
+  current_modules: string[] | null;
 };
-
-const MODULE_PILLS = [
-  { label: "CS1101S", color: "bg-[#B8E0D2] text-[#1a6b52]" },
-  { label: "CS1231S", color: "bg-[#B8E0D2] text-[#1a6b52]" },
-  { label: "MA1521",  color: "bg-[#B8E0D2] text-[#1a6b52]" },
-  { label: "IS1108",  color: "bg-[#F5D48A] text-[#7A4F00]" },
-];
 
 function ProfilePage() {
   const { session, loading, signOut } = useAuth();
@@ -36,10 +32,10 @@ function ProfilePage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!session) { navigate({ to: "/auth" }); return; }
+    if (!session) { navigate({ to: "/auth/" }); return; }
     supabase
       .from("profiles")
-      .select("display_name, course, faculty, year_of_study, accommodation, study_style, telegram_handle, bio, email")
+      .select("display_name, course, faculty, year_of_study, accommodation, study_style, telegram_handle, bio, email, avatar_url, current_modules")
       .eq("id", session.user.id)
       .single()
       .then(({ data }) => { if (data) setProfile(data as Profile); });
@@ -47,7 +43,7 @@ function ProfilePage() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate({ to: "/auth" });
+    navigate({ to: "/auth/" });
   };
 
   if (loading || !profile) return null;
@@ -74,29 +70,30 @@ function ProfilePage() {
           <span className="font-semibold text-[#3A2410] text-base">Kopi Kakis</span>
         </div>
         <div className="flex items-center gap-4">
-          <button className="text-[#5C3317]">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
-            </svg>
-          </button>
-          <button className="text-[#5C3317]">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-            </svg>
-          </button>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-[#5C3317]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-[#5C3317]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+          </svg>
         </div>
       </header>
 
-      <main className="flex-1 px-4 py-4 flex flex-col gap-4 pb-24">
+      {/* Centered mobile column */}
+      <main className="flex-1 w-full max-w-md mx-auto px-4 py-4 flex flex-col gap-4 pb-24">
 
         <h2 className="text-xs font-medium text-[#7A6A55] uppercase tracking-wide">My profile</h2>
 
         {/* Profile card */}
         <div className="bg-[#E0D9C8] rounded-2xl border border-[rgba(92,51,23,0.12)] p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-full bg-[#C8B89A] flex items-center justify-center text-lg font-semibold text-[#5C3317] flex-shrink-0">
-              {initials}
-            </div>
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt="Avatar" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-[#C8B89A] flex items-center justify-center text-lg font-semibold text-[#5C3317] flex-shrink-0">
+                {initials}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <div className="font-semibold text-[#3A2410]">{profile.display_name ?? "Your Name"}</div>
               {profile.telegram_handle && (
@@ -106,10 +103,7 @@ function ProfilePage() {
                 {[profile.course, profile.year_of_study, profile.accommodation].filter(Boolean).join(" · ")}
               </div>
             </div>
-            <button
-              onClick={() => navigate({ to: "/profile/setup" })}
-              className="text-[#7A6A55] hover:text-[#5C3317]"
-            >
+            <button onClick={() => navigate({ to: "/profile/edit" })} className="text-[#7A6A55] hover:text-[#5C3317]">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
               </svg>
@@ -123,6 +117,9 @@ function ProfilePage() {
           )}
 
           <div className="flex flex-wrap gap-1.5">
+            {(profile.current_modules ?? []).map((code) => (
+              <ModulePill key={code} code={code} />
+            ))}
             {profile.study_style && (
               <span className="text-[10px] bg-[#D3CFC6] text-[#4A4035] px-2 py-0.5 rounded-full">
                 {profile.study_style}
@@ -135,44 +132,21 @@ function ProfilePage() {
         <h2 className="text-xs font-medium text-[#7A6A55] uppercase tracking-wide">Account</h2>
 
         <div className="bg-[#E0D9C8] rounded-2xl border border-[rgba(92,51,23,0.12)] overflow-hidden">
-          <SettingsRow
-            icon={<UserIcon />}
-            label="Edit profile"
-            onClick={() => navigate({ to: "/profile/setup" })}
-          />
-          <SettingsRow
-            icon={<LockIcon />}
-            label="Change password"
-            onClick={() => toast.info("Password change coming soon!")}
-          />
-          <SettingsRow
-            icon={<ShieldIcon />}
-            label="Privacy settings"
-            onClick={() => toast.info("Privacy settings coming soon!")}
-          />
-          <SettingsRow
-            icon={<FlagIcon />}
-            label="Report a user"
-            onClick={() => setShowReport(true)}
-            last
-          />
+          <SettingsRow icon={<UserIcon />} label="Edit profile" onClick={() => navigate({ to: "/profile/edit" })} />
+          <SettingsRow icon={<LockIcon />} label="Change password" onClick={() => toast.info("Password change coming soon!")} />
+          <SettingsRow icon={<ShieldIcon />} label="Privacy settings" onClick={() => toast.info("Privacy settings coming soon!")} />
+          <SettingsRow icon={<FlagIcon />} label="Report a user" onClick={() => setShowReport(true)} last />
         </div>
 
         {/* Log out */}
         <div className="text-center py-2">
-          <button
-            onClick={handleSignOut}
-            className="text-sm font-medium text-red-600 hover:text-red-700"
-          >
+          <button onClick={handleSignOut} className="text-sm font-medium text-red-600 hover:text-red-700">
             Log out
           </button>
         </div>
       </main>
 
-      {/* Report modal */}
-      {showReport && (
-        <ReportModal onClose={() => setShowReport(false)} userId={session!.user.id} />
-      )}
+      {showReport && <ReportModal onClose={() => setShowReport(false)} userId={session!.user.id} />}
 
       <BottomNav active="profile" />
     </div>
@@ -180,10 +154,7 @@ function ProfilePage() {
 }
 
 function SettingsRow({ icon, label, onClick, last }: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  last?: boolean;
+  icon: React.ReactNode; label: string; onClick: () => void; last?: boolean;
 }) {
   return (
     <button
@@ -206,23 +177,15 @@ function ReportModal({ onClose, userId }: { onClose: () => void; userId: string 
   const [description, setDescription] = useState("");
   const [reportedEmail, setReportedEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
   const reasons = ["Inappropriate bio", "Fake profile", "Harassment", "Other"];
 
   const submit = async () => {
     if (!reason || !reportedEmail) { toast.error("Please fill in all required fields."); return; }
     setSubmitting(true);
-    const { data: reported } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", reportedEmail)
-      .single();
+    const { data: reported } = await supabase.from("profiles").select("id").eq("email", reportedEmail).single();
     if (!reported) { toast.error("User not found."); setSubmitting(false); return; }
     const { error } = await supabase.from("reports").insert({
-      reporter_id: userId,
-      reported_id: reported.id,
-      reason,
-      description,
+      reporter_id: userId, reported_id: reported.id, reason, description,
     });
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
@@ -232,61 +195,30 @@ function ReportModal({ onClose, userId }: { onClose: () => void; userId: string 
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end z-50" onClick={onClose}>
-      <div className="bg-[#EDE8DC] rounded-t-3xl w-full p-6 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-[#EDE8DC] rounded-t-3xl w-full max-w-md mx-auto p-6 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-semibold text-[#3A2410]">Report a user</h3>
-
         <div>
           <label className="text-xs text-[#7A6A55] mb-1 block">Their NUS email *</label>
-          <input
-            className={inp}
-            placeholder="e0XXXXXX@u.nus.edu"
-            value={reportedEmail}
-            onChange={(e) => setReportedEmail(e.target.value)}
-          />
+          <input className={inp} placeholder="e0XXXXXX@u.nus.edu" value={reportedEmail} onChange={(e) => setReportedEmail(e.target.value)} />
         </div>
-
         <div>
           <label className="text-xs text-[#7A6A55] mb-1 block">Reason *</label>
           <div className="flex flex-wrap gap-2">
             {reasons.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setReason(r)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  reason === r
-                    ? "bg-[#5C3317] text-[#FAF6EF] border-[#5C3317]"
-                    : "bg-transparent text-[#3A2410] border-[rgba(92,51,23,0.25)]"
-                }`}
-              >
-                {r}
-              </button>
+              <button key={r} type="button" onClick={() => setReason(r)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+                  reason === r ? "bg-[#5C3317] text-[#FAF6EF] border-[#5C3317]" : "text-[#3A2410] border-[rgba(92,51,23,0.25)]"
+                }`}>{r}</button>
             ))}
           </div>
         </div>
-
         <div>
           <label className="text-xs text-[#7A6A55] mb-1 block">Additional details (optional)</label>
-          <textarea
-            className={`${inp} min-h-[80px] resize-none`}
-            placeholder="Describe what happened..."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
+          <textarea className={`${inp} min-h-[80px] resize-none`} value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
-
         <div className="flex gap-2">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-full border border-[rgba(92,51,23,0.25)] py-3 text-sm text-[#7A6A55]"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={submit}
-            disabled={submitting}
-            className="flex-1 rounded-full bg-[#5C3317] py-3 text-sm font-semibold text-[#FAF6EF] disabled:opacity-50"
-          >
+          <button onClick={onClose} className="flex-1 rounded-full border border-[rgba(92,51,23,0.25)] py-3 text-sm text-[#7A6A55]">Cancel</button>
+          <button onClick={submit} disabled={submitting} className="flex-1 rounded-full bg-[#5C3317] py-3 text-sm font-semibold text-[#FAF6EF] disabled:opacity-50">
             {submitting ? "Submitting..." : "Submit report"}
           </button>
         </div>
@@ -297,15 +229,7 @@ function ReportModal({ onClose, userId }: { onClose: () => void; userId: string 
 
 const inp = "w-full rounded-xl border border-[rgba(92,51,23,0.2)] bg-[#E0D9C8] px-4 py-2.5 text-sm text-[#3A2410] placeholder:text-[#7A6A55] outline-none focus:ring-2 focus:ring-[#5C3317]/30";
 
-function UserIcon() {
-  return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>;
-}
-function LockIcon() {
-  return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>;
-}
-function ShieldIcon() {
-  return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>;
-}
-function FlagIcon() {
-  return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 21V4m0 0l9-2 9 2v13l-9-2-9 2V4z"/></svg>;
-}
+function UserIcon() { return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>; }
+function LockIcon() { return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>; }
+function ShieldIcon() { return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>; }
+function FlagIcon() { return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 21V4m0 0l9-2 9 2v13l-9-2-9 2V4z"/></svg>; }

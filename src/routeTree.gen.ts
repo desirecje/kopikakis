@@ -12,8 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile.index'
+import { Route as KakisIndexRouteImport } from './routes/kakis.index'
+import { Route as BidsIndexRouteImport } from './routes/bids.index'
 import { Route as AuthIndexRouteImport } from './routes/auth.index'
 import { Route as ProfileSetupRouteImport } from './routes/profile.setup'
+import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as AuthSignupRouteImport } from './routes/auth.signup'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 
@@ -32,6 +35,16 @@ const ProfileIndexRoute = ProfileIndexRouteImport.update({
   path: '/profile/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KakisIndexRoute = KakisIndexRouteImport.update({
+  id: '/kakis/',
+  path: '/kakis/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BidsIndexRoute = BidsIndexRouteImport.update({
+  id: '/bids/',
+  path: '/bids/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthIndexRoute = AuthIndexRouteImport.update({
   id: '/auth/',
   path: '/auth/',
@@ -40,6 +53,11 @@ const AuthIndexRoute = AuthIndexRouteImport.update({
 const ProfileSetupRoute = ProfileSetupRouteImport.update({
   id: '/profile/setup',
   path: '/profile/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileEditRoute = ProfileEditRouteImport.update({
+  id: '/profile/edit',
+  path: '/profile/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthSignupRoute = AuthSignupRouteImport.update({
@@ -58,8 +76,11 @@ export interface FileRoutesByFullPath {
   '/home': typeof HomeRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
+  '/profile/edit': typeof ProfileEditRoute
   '/profile/setup': typeof ProfileSetupRoute
   '/auth/': typeof AuthIndexRoute
+  '/bids/': typeof BidsIndexRoute
+  '/kakis/': typeof KakisIndexRoute
   '/profile/': typeof ProfileIndexRoute
 }
 export interface FileRoutesByTo {
@@ -67,8 +88,11 @@ export interface FileRoutesByTo {
   '/home': typeof HomeRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
+  '/profile/edit': typeof ProfileEditRoute
   '/profile/setup': typeof ProfileSetupRoute
   '/auth': typeof AuthIndexRoute
+  '/bids': typeof BidsIndexRoute
+  '/kakis': typeof KakisIndexRoute
   '/profile': typeof ProfileIndexRoute
 }
 export interface FileRoutesById {
@@ -77,8 +101,11 @@ export interface FileRoutesById {
   '/home': typeof HomeRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
+  '/profile/edit': typeof ProfileEditRoute
   '/profile/setup': typeof ProfileSetupRoute
   '/auth/': typeof AuthIndexRoute
+  '/bids/': typeof BidsIndexRoute
+  '/kakis/': typeof KakisIndexRoute
   '/profile/': typeof ProfileIndexRoute
 }
 export interface FileRouteTypes {
@@ -88,8 +115,11 @@ export interface FileRouteTypes {
     | '/home'
     | '/auth/login'
     | '/auth/signup'
+    | '/profile/edit'
     | '/profile/setup'
     | '/auth/'
+    | '/bids/'
+    | '/kakis/'
     | '/profile/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -97,8 +127,11 @@ export interface FileRouteTypes {
     | '/home'
     | '/auth/login'
     | '/auth/signup'
+    | '/profile/edit'
     | '/profile/setup'
     | '/auth'
+    | '/bids'
+    | '/kakis'
     | '/profile'
   id:
     | '__root__'
@@ -106,8 +139,11 @@ export interface FileRouteTypes {
     | '/home'
     | '/auth/login'
     | '/auth/signup'
+    | '/profile/edit'
     | '/profile/setup'
     | '/auth/'
+    | '/bids/'
+    | '/kakis/'
     | '/profile/'
   fileRoutesById: FileRoutesById
 }
@@ -116,8 +152,11 @@ export interface RootRouteChildren {
   HomeRoute: typeof HomeRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthSignupRoute: typeof AuthSignupRoute
+  ProfileEditRoute: typeof ProfileEditRoute
   ProfileSetupRoute: typeof ProfileSetupRoute
   AuthIndexRoute: typeof AuthIndexRoute
+  BidsIndexRoute: typeof BidsIndexRoute
+  KakisIndexRoute: typeof KakisIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
 }
 
@@ -144,6 +183,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kakis/': {
+      id: '/kakis/'
+      path: '/kakis'
+      fullPath: '/kakis/'
+      preLoaderRoute: typeof KakisIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bids/': {
+      id: '/bids/'
+      path: '/bids'
+      fullPath: '/bids/'
+      preLoaderRoute: typeof BidsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/': {
       id: '/auth/'
       path: '/auth'
@@ -156,6 +209,13 @@ declare module '@tanstack/react-router' {
       path: '/profile/setup'
       fullPath: '/profile/setup'
       preLoaderRoute: typeof ProfileSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile/edit': {
+      id: '/profile/edit'
+      path: '/profile/edit'
+      fullPath: '/profile/edit'
+      preLoaderRoute: typeof ProfileEditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/signup': {
@@ -180,8 +240,11 @@ const rootRouteChildren: RootRouteChildren = {
   HomeRoute: HomeRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthSignupRoute: AuthSignupRoute,
+  ProfileEditRoute: ProfileEditRoute,
   ProfileSetupRoute: ProfileSetupRoute,
   AuthIndexRoute: AuthIndexRoute,
+  BidsIndexRoute: BidsIndexRoute,
+  KakisIndexRoute: KakisIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
 }
 export const routeTree = rootRouteImport

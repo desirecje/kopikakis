@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { CourseSelect } from "@/components/CourseSelect";
 
 export const Route = createFileRoute("/profile/setup")({
   head: () => ({ meta: [{ title: "Set up your profile — Kopi Kaki" }] }),
@@ -140,11 +141,9 @@ function ProfileSetupPage() {
               </Field>
 
               <Field label="Course / Major">
-                <input
-                  className={inp}
-                  placeholder="e.g. Computer Science"
+                <CourseSelect
                   value={form.course}
-                  onChange={(e) => update("course", e.target.value)}
+                  onChange={(c) => update("course", c)}
                 />
               </Field>
 
