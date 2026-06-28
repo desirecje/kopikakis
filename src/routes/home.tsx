@@ -2,6 +2,9 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { NotificationBell } from "@/components/NotificationBell";
+import { notify } from "@/lib/notify";
 
 export const Route = createFileRoute("/home")({
   component: HomePage,
@@ -16,15 +19,29 @@ type Profile = {
   study_style: string | null;
 };
 
+type Meetup = {
+  id: string;
+  organiser_id: string;
+  invitee_id: string;
+  title: string;
+  location: string | null;
+  meet_at: string;
+  status: string;
+  otherName: string;
+  isInvitee: boolean;
+};
+
 function HomePage() {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const [suggested, setSuggested] = useState<Profile[]>([]);
+  const [meetups, setMeetups] = useState<Meetup[]>([]);
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (loading) return;
-    if (!session) { navigate({ to: "/auth" }); return; }
+    if (!session) { navigate({ to: "/auth/" }); return; }
 
     supabase
       .from("profiles")
@@ -37,22 +54,126 @@ function HomePage() {
         } else {
           setChecking(false);
           loadSuggested();
+          loadMeetups();
         }
       });
   }, [loading, session, navigate]);
 
   const loadSuggested = async () => {
     if (!session) return;
+    const uid = session.user.id;
     const { data } = await supabase
       .from("profiles")
       .select("id, display_name, course, year_of_study, accommodation, study_style")
-      .neq("id", session.user.id)
+      .neq("id", uid)
       .not("course", "is", null)
       .limit(4);
     if (data) setSuggested(data as Profile[]);
+
+    // Track who we've already sent requests to
+    const { data: reqs } = await supabase
+      .from("buddy_requests")
+      .select("receiver_id")
+      .eq("sender_id", uid);
+    setSentIds(new Set((reqs ?? []).map((r) => r.receiver_id)));
+  };
+
+  const quickAdd = async (receiverId: string) => {
+    if (!session) return;
+    const { error } = await supabase.from("buddy_requests").insert({
+      sender_id: session.user.id,
+      receiver_id: receiverId,
+      status: "pending",
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success("Kaki request sent!");
+    setSentIds((prev) => new Set(prev).add(receiverId));
+    // Notify the receiver
+    const myName = session.user.email?.split("@")[0] ?? "Someone";
+    await notify({
+      userId: receiverId,
+      actorId: session.user.id,
+      type: "request",
+      message: `${myName} sent you a kaki request!`,
+    });
+  };
+
+  const cancelRequest = async (receiverId: string) => {
+    if (!session) return;
+    const { error } = await supabase
+      .from("buddy_requests")
+      .delete()
+      .eq("sender_id", session.user.id)
+      .eq("receiver_id", receiverId)
+      .eq("status", "pending");
+    if (error) { toast.error(error.message); return; }
+    toast.success("Request cancelled");
+    setSentIds((prev) => {
+      const next = new Set(prev);
+      next.delete(receiverId);
+      return next;
+    });
+  };
+
+  const loadMeetups = async () => {
+    if (!session) return;
+    const uid = session.user.id;
+    const { data: rows } = await supabase
+      .from("meetups")
+      .select("id, organiser_id, invitee_id, title, location, meet_at, status")
+      .or(`organiser_id.eq.${uid},invitee_id.eq.${uid}`)
+      .gte("meet_at", new Date().toISOString())
+      .order("meet_at", { ascending: true });
+
+    if (!rows) { setMeetups([]); return; }
+
+    // Resolve the "other person" name for each
+    const otherIds = [...new Set(rows.map((r) => (r.organiser_id === uid ? r.invitee_id : r.organiser_id)))];
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", otherIds);
+    const nameMap = new Map((profiles ?? []).map((p) => [p.id, p.display_name ?? "Unknown"]));
+
+    setMeetups(rows.map((r) => ({
+      ...r,
+      otherName: nameMap.get(r.organiser_id === uid ? r.invitee_id : r.organiser_id) ?? "Unknown",
+      isInvitee: r.invitee_id === uid,
+    })));
+  };
+
+  const respondMeetup = async (m: Meetup, accept: boolean) => {
+    if (!session) return;
+    const { error } = await supabase
+      .from("meetups")
+      .update({ status: accept ? "accepted" : "declined" })
+      .eq("id", m.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(accept ? "Meet-up confirmed! ☕" : "Meet-up declined");
+
+    // Notify the organiser
+    const myName = session.user.email?.split("@")[0] ?? "Someone";
+    await notify({
+      userId: m.organiser_id,
+      actorId: session.user.id,
+      type: accept ? "meetup_accepted" : "meetup_declined",
+      message: `${myName} ${accept ? "accepted" : "declined"} your Kopi Meet-up: ${m.title}`,
+    });
+    loadMeetups();
   };
 
   if (loading || checking) return null;
+
+  // Group meet-ups by day label
+  const fmtDay = (iso: string) => {
+    const d = new Date(iso);
+    const today = new Date();
+    const tomorrow = new Date(); tomorrow.setDate(today.getDate() + 1);
+    if (d.toDateString() === today.toDateString()) return "Today";
+    if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  };
+  const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="min-h-screen bg-[#EDE8DC] flex flex-col">
@@ -79,34 +200,56 @@ function HomePage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
             </svg>
           </button>
-          <button className="text-[#5C3317]">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-            </svg>
-          </button>
+          <NotificationBell />
         </div>
       </header>
 
-      <main className="flex-1 px-4 py-4 flex flex-col gap-5 pb-24">
+      <main className="flex-1 w-full max-w-md mx-auto px-4 py-4 flex flex-col gap-5 pb-24">
 
         {/* Kopi Meet-ups */}
         <section>
           <h2 className="font-semibold text-[#3A2410] text-sm mb-2">Kopi Meet-ups</h2>
           <div className="bg-[#E0D9C8] rounded-2xl border border-[rgba(92,51,23,0.12)] p-4 flex flex-col gap-3">
-            <div>
-              <div className="text-xs font-semibold text-[#3A2410] border-b border-[rgba(92,51,23,0.15)] pb-1 mb-2">Today</div>
-              <div className="flex items-center justify-between">
+            {meetups.length === 0 ? (
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-8 bg-[#5C3317] rounded-full"/>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-8 bg-[#5C3317] rounded-full"/>
-                    <div>
-                      <div className="text-sm font-medium text-[#3A2410]">No meet-ups yet</div>
-                      <div className="text-xs text-[#7A6A55]">Connect with kakis to plan one!</div>
-                    </div>
-                  </div>
+                  <div className="text-sm font-medium text-[#3A2410]">No meet-ups yet</div>
+                  <div className="text-xs text-[#7A6A55]">Connect with kakis to plan one!</div>
                 </div>
               </div>
-            </div>
+            ) : (
+              meetups.map((m) => (
+                <div key={m.id} className="flex items-start gap-3">
+                  <div className="w-1 self-stretch bg-[#5C3317] rounded-full min-h-[2.5rem]"/>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-[#3A2410]">{m.title}</div>
+                      <div className="text-xs font-medium text-[#3A2410] whitespace-nowrap">
+                        {fmtDay(m.meet_at)} · {fmtTime(m.meet_at)}
+                      </div>
+                    </div>
+                    <div className="text-xs text-[#7A6A55]">
+                      with {m.otherName}{m.location ? ` · ${m.location}` : ""}
+                    </div>
+
+                    {/* Status / actions */}
+                    {m.status === "pending" && m.isInvitee ? (
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => respondMeetup(m, true)} className="flex-1 bg-[#C8D8C0] text-[#274020] rounded-full py-1.5 text-xs font-semibold">Accept</button>
+                        <button onClick={() => respondMeetup(m, false)} className="flex-1 bg-[#D98A8A] text-[#5c1f1f] rounded-full py-1.5 text-xs font-semibold">Decline</button>
+                      </div>
+                    ) : m.status === "pending" ? (
+                      <div className="text-[11px] text-[#7A6A55] mt-1 italic">Waiting for {m.otherName} to respond…</div>
+                    ) : m.status === "accepted" ? (
+                      <span className="inline-block mt-1.5 bg-[#C8D8C0] text-[#274020] text-[10px] font-medium px-2 py-0.5 rounded-full">Confirmed ✓</span>
+                    ) : (
+                      <span className="inline-block mt-1.5 bg-[#E0D0D0] text-[#7a3030] text-[10px] font-medium px-2 py-0.5 rounded-full">Declined</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 
@@ -136,9 +279,21 @@ function HomePage() {
                   {p.study_style && (
                     <span className="text-[10px] bg-[#D3CFC6] text-[#4A4035] px-2 py-0.5 rounded-full w-fit">{p.study_style}</span>
                   )}
-                  <button className="w-full rounded-full bg-[#5C3317] py-1.5 text-xs font-semibold text-[#FAF6EF] hover:opacity-90">
-                    Quick Add
-                  </button>
+                  {sentIds.has(p.id) ? (
+                    <button
+                      onClick={() => cancelRequest(p.id)}
+                      className="w-full rounded-full border border-[rgba(92,51,23,0.3)] py-1.5 text-xs font-semibold text-[#7A6A55] hover:bg-[#EDE8DC]"
+                    >
+                      Cancel request
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => quickAdd(p.id)}
+                      className="w-full rounded-full bg-[#5C3317] py-1.5 text-xs font-semibold text-[#FAF6EF] hover:opacity-90"
+                    >
+                      Quick Add
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -146,7 +301,6 @@ function HomePage() {
         </section>
       </main>
 
-      {/* Bottom nav */}
       <BottomNav active="home" />
     </div>
   );

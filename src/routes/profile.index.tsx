@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BottomNav } from "./home";
+import { NotificationBell } from "@/components/NotificationBell";
 import { ModulePill } from "@/components/ModulePill";
 
 export const Route = createFileRoute("/profile/")({
@@ -73,9 +74,7 @@ function ProfilePage() {
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-[#5C3317]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
           </svg>
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-[#5C3317]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-          </svg>
+          <NotificationBell />
         </div>
       </header>
 

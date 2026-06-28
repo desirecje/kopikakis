@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BottomNav } from "./home";
+import { NotificationBell } from "@/components/NotificationBell";
 import { ModulePill } from "@/components/ModulePill";
 import { courseMatchesQuery } from "@/lib/nus-courses";
+import { MeetupModal } from "@/components/MeetupModal";
+import { notify } from "@/lib/notify";
 
 export const Route = createFileRoute("/kakis/")({
   head: () => ({ meta: [{ title: "Find Kakis — Kopi Kaki" }] }),
@@ -42,9 +45,11 @@ function KakisPage() {
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const [requests, setRequests] = useState<(BuddyRequest & { profile: Profile })[]>([]);
   const [connected, setConnected] = useState<Profile[]>([]);
+  const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
   const [viewing, setViewing] = useState<Profile | null>(null);
   const [myModules, setMyModules] = useState<string[]>([]);
+  const [meetupTarget, setMeetupTarget] = useState<Profile | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -94,6 +99,7 @@ function KakisPage() {
     setAllProfiles((profiles ?? []) as Profile[]);
     setRequests(incoming as (BuddyRequest & { profile: Profile })[]);
     setConnected(connectedProfiles);
+    setConnectedIds(new Set(acceptedIds));
     setSentIds(sent);
   };
 
@@ -107,21 +113,70 @@ function KakisPage() {
     if (error) { toast.error(error.message); return; }
     toast.success("Buddy request sent!");
     setSentIds((prev) => new Set(prev).add(receiverId));
+    // Notify the receiver
+    const myName = session.user.email?.split("@")[0] ?? "Someone";
+    await notify({
+      userId: receiverId,
+      actorId: session.user.id,
+      type: "request",
+      message: `${myName} sent you a kaki request!`,
+    });
   };
 
-  const respondRequest = async (requestId: string, accept: boolean) => {
+  const cancelRequest = async (receiverId: string) => {
+    if (!session) return;
+    const { error } = await supabase
+      .from("buddy_requests")
+      .delete()
+      .eq("sender_id", session.user.id)
+      .eq("receiver_id", receiverId)
+      .eq("status", "pending");
+    if (error) { toast.error(error.message); return; }
+    toast.success("Request cancelled");
+    setSentIds((prev) => {
+      const next = new Set(prev);
+      next.delete(receiverId);
+      return next;
+    });
+  };
+
+  const respondRequest = async (requestId: string, accept: boolean, senderId?: string) => {
     const { error } = await supabase
       .from("buddy_requests")
       .update({ status: accept ? "accepted" : "declined" })
       .eq("id", requestId);
     if (error) { toast.error(error.message); return; }
+
+    // If accepted, clean up any reciprocal pending request between the two users
+    // (e.g. I also sent them a request earlier) so it doesn't linger as "pending"
+    if (accept && senderId && session) {
+      await supabase
+        .from("buddy_requests")
+        .delete()
+        .eq("sender_id", session.user.id)
+        .eq("receiver_id", senderId)
+        .eq("status", "pending");
+    }
+
     toast.success(accept ? "Kaki added!" : "Request declined");
+    // Notify the sender if accepted
+    if (accept && senderId && session) {
+      const myName = session.user.email?.split("@")[0] ?? "Someone";
+      await notify({
+        userId: senderId,
+        actorId: session.user.id,
+        type: "request_accepted",
+        message: `${myName} accepted your kaki request! ☕`,
+      });
+    }
     loadData();
   };
 
   if (loading) return null;
 
-  const filtered = allProfiles.filter((p) => courseMatchesQuery(p.course, courseQuery));
+  const filtered = allProfiles
+    .filter((p) => !connectedIds.has(p.id))            // hide people you're already kakis with
+    .filter((p) => courseMatchesQuery(p.course, courseQuery));
 
   const sharedModules = (p: Profile) => {
     const theirs = p.current_modules ?? [];
@@ -160,9 +215,7 @@ function KakisPage() {
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-[#5C3317]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
           </svg>
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-[#5C3317]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-          </svg>
+          <NotificationBell />
         </div>
       </header>
 
@@ -246,6 +299,7 @@ function KakisPage() {
                     shared={sharedModules(p)}
                     alreadySent={sentIds.has(p.id)}
                     onAdd={() => sendRequest(p.id)}
+                    onCancel={() => cancelRequest(p.id)}
                     onView={() => setViewing(p)}
                   />
                 ))
@@ -259,7 +313,7 @@ function KakisPage() {
                     key={r.id}
                     profile={r.profile}
                     score={scoreFor(r.profile)}
-                    onAccept={() => respondRequest(r.id, true)}
+                    onAccept={() => respondRequest(r.id, true, r.profile.id)}
                     onReject={() => respondRequest(r.id, false)}
                     onView={() => setViewing(r.profile)}
                   />
@@ -271,10 +325,19 @@ function KakisPage() {
           connected.length === 0 ? (
             <EmptyState text="No kakis yet. Send some requests to connect!" />
           ) : (
-            connected.map((p) => <ConnectedCard key={p.id} profile={p} onView={() => setViewing(p)} />)
+            connected.map((p) => <ConnectedCard key={p.id} profile={p} onView={() => setViewing(p)} onMeetup={() => setMeetupTarget(p)} />)
           )
         )}
       </main>
+
+      {/* Meet-up modal */}
+      {meetupTarget && (
+        <MeetupModal
+          inviteeId={meetupTarget.id}
+          inviteeName={meetupTarget.display_name ?? "your kaki"}
+          onClose={() => setMeetupTarget(null)}
+        />
+      )}
 
       {/* View profile modal */}
       {viewing && (
@@ -312,8 +375,8 @@ function StylePill({ style }: { style: string | null }) {
   return <span className="text-[10px] bg-[#D3CFC6] text-[#4A4035] px-2 py-0.5 rounded-full">{style}</span>;
 }
 
-function DiscoverCard({ profile, score, shared, alreadySent, onAdd, onView }: {
-  profile: Profile; score: number; shared: string[]; alreadySent: boolean; onAdd: () => void; onView: () => void;
+function DiscoverCard({ profile, score, shared, alreadySent, onAdd, onCancel, onView }: {
+  profile: Profile; score: number; shared: string[]; alreadySent: boolean; onAdd: () => void; onCancel: () => void; onView: () => void;
 }) {
   return (
     <div className="bg-[#E0D9C8] rounded-2xl border border-[rgba(92,51,23,0.12)] p-4">
@@ -340,13 +403,21 @@ function DiscoverCard({ profile, score, shared, alreadySent, onAdd, onView }: {
         <button onClick={onView} className="flex-1 bg-[#EDE8DC] border border-[rgba(92,51,23,0.2)] rounded-full py-2 text-xs font-medium text-[#3A2410]">
           View Profile
         </button>
-        <button
-          onClick={onAdd}
-          disabled={alreadySent}
-          className="flex-1 bg-[#5C3317] rounded-full py-2 text-xs font-semibold text-[#FAF6EF] disabled:opacity-50"
-        >
-          {alreadySent ? "Request sent" : "Add Kaki"}
-        </button>
+        {alreadySent ? (
+          <button
+            onClick={onCancel}
+            className="flex-1 border border-[rgba(92,51,23,0.3)] rounded-full py-2 text-xs font-semibold text-[#7A6A55] hover:bg-[#EDE8DC]"
+          >
+            Cancel request
+          </button>
+        ) : (
+          <button
+            onClick={onAdd}
+            className="flex-1 bg-[#5C3317] rounded-full py-2 text-xs font-semibold text-[#FAF6EF]"
+          >
+            Add Kaki
+          </button>
+        )}
       </div>
     </div>
   );
@@ -380,7 +451,7 @@ function RequestCard({ profile, score, onAccept, onReject, onView }: {
   );
 }
 
-function ConnectedCard({ profile, onView }: { profile: Profile; onView: () => void }) {
+function ConnectedCard({ profile, onView, onMeetup }: { profile: Profile; onView: () => void; onMeetup: () => void }) {
   return (
     <div className="bg-[#E0D9C8] rounded-2xl border border-[rgba(92,51,23,0.12)] p-4">
       <div className="flex items-center gap-3 cursor-pointer" onClick={onView}>
@@ -396,7 +467,7 @@ function ConnectedCard({ profile, onView }: { profile: Profile; onView: () => vo
       <div className="flex flex-wrap gap-1.5 mt-2">
         <StylePill style={profile.study_style} />
       </div>
-      <button className="w-full bg-[#5C3317] rounded-full py-2 text-xs font-semibold text-[#FAF6EF] mt-3">
+      <button onClick={onMeetup} className="w-full bg-[#5C3317] rounded-full py-2 text-xs font-semibold text-[#FAF6EF] mt-3">
         Kopi Meet-up
       </button>
     </div>
