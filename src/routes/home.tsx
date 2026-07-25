@@ -207,7 +207,7 @@ function HomePage() {
     <div className="min-h-screen bg-[#EDE8DC] flex flex-col">
       {/* Top bar */}
       <header className="bg-[#EDE8DC] border-b border-[rgba(92,51,23,0.12)] px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2">
+        <Link to="/home" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <div className="w-8 h-8 bg-[#5C3317] rounded-lg flex items-center justify-center">
             <svg viewBox="0 0 80 80" className="w-5 h-5">
               <rect x="18" y="6" width="44" height="10" rx="5" fill="#EDE8DC"/>
@@ -221,7 +221,7 @@ function HomePage() {
             </svg>
           </div>
           <span className="font-semibold text-[#3A2410] text-base">Kopi Kakis</span>
-        </div>
+        </Link>
         <div className="flex items-center gap-4">
           <button className="text-[#5C3317]">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
