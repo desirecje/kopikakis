@@ -37,6 +37,10 @@ function HomePage() {
   const [checking, setChecking] = useState(true);
   const [suggested, setSuggested] = useState<Profile[]>([]);
   const [meetups, setMeetups] = useState<Meetup[]>([]);
+  const [pastMeetups, setPastMeetups] = useState<Meetup[]>([]);
+  const [meetupsExpanded, setMeetupsExpanded] = useState(false);
+  const [meetupView, setMeetupView] = useState<"list" | "calendar">("list");
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -62,20 +66,40 @@ function HomePage() {
   const loadSuggested = async () => {
     if (!session) return;
     const uid = session.user.id;
+
+    // Every request involving me, in both directions
+    const { data: reqs } = await supabase
+      .from("buddy_requests")
+      .select("sender_id, receiver_id, status")
+      .or(`sender_id.eq.${uid},receiver_id.eq.${uid}`);
+
+    // People I'm already connected with (accepted, either direction)
+    const connectedIds = new Set(
+      (reqs ?? [])
+        .filter((r) => r.status === "accepted")
+        .map((r) => (r.sender_id === uid ? r.receiver_id : r.sender_id))
+    );
+
+    // Only requests I have SENT that are still pending should show "Cancel request"
+    const pendingSentIds = new Set(
+      (reqs ?? [])
+        .filter((r) => r.sender_id === uid && r.status === "pending")
+        .map((r) => r.receiver_id)
+    );
+    setSentIds(pendingSentIds);
+
+    // Fetch candidates, then drop me + anyone I'm already connected with
     const { data } = await supabase
       .from("profiles")
       .select("id, display_name, course, year_of_study, accommodation, study_style")
       .neq("id", uid)
       .not("course", "is", null)
-      .limit(4);
-    if (data) setSuggested(data as Profile[]);
+      .limit(20);
 
-    // Track who we've already sent requests to
-    const { data: reqs } = await supabase
-      .from("buddy_requests")
-      .select("receiver_id")
-      .eq("sender_id", uid);
-    setSentIds(new Set((reqs ?? []).map((r) => r.receiver_id)));
+    const filtered = (data ?? [])
+      .filter((p) => !connectedIds.has(p.id))
+      .slice(0, 4);
+    setSuggested(filtered as Profile[]);
   };
 
   const quickAdd = async (receiverId: string) => {
@@ -118,14 +142,14 @@ function HomePage() {
   const loadMeetups = async () => {
     if (!session) return;
     const uid = session.user.id;
+    // Fetch ALL meet-ups (past and future), newest activity handled client-side
     const { data: rows } = await supabase
       .from("meetups")
       .select("id, organiser_id, invitee_id, title, location, meet_at, status")
       .or(`organiser_id.eq.${uid},invitee_id.eq.${uid}`)
-      .gte("meet_at", new Date().toISOString())
       .order("meet_at", { ascending: true });
 
-    if (!rows) { setMeetups([]); return; }
+    if (!rows) { setMeetups([]); setPastMeetups([]); return; }
 
     // Resolve the "other person" name for each
     const otherIds = [...new Set(rows.map((r) => (r.organiser_id === uid ? r.invitee_id : r.organiser_id)))];
@@ -135,11 +159,15 @@ function HomePage() {
       .in("id", otherIds);
     const nameMap = new Map((profiles ?? []).map((p) => [p.id, p.display_name ?? "Unknown"]));
 
-    setMeetups(rows.map((r) => ({
+    const mapped: Meetup[] = rows.map((r) => ({
       ...r,
       otherName: nameMap.get(r.organiser_id === uid ? r.invitee_id : r.organiser_id) ?? "Unknown",
       isInvitee: r.invitee_id === uid,
-    })));
+    }));
+
+    const now = Date.now();
+    setMeetups(mapped.filter((m) => new Date(m.meet_at).getTime() >= now));
+    setPastMeetups(mapped.filter((m) => new Date(m.meet_at).getTime() < now).reverse()); // most recent past first
   };
 
   const respondMeetup = async (m: Meetup, accept: boolean) => {
@@ -208,9 +236,23 @@ function HomePage() {
 
         {/* Kopi Meet-ups */}
         <section>
-          <h2 className="font-semibold text-[#3A2410] text-sm mb-2">Kopi Meet-ups</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold text-[#3A2410] text-sm">Kopi Meet-ups</h2>
+            {(meetups.length > 0 || pastMeetups.length > 0) && (
+              <button
+                onClick={() => setMeetupsExpanded((v) => !v)}
+                className="text-xs text-[#5C3317] font-medium flex items-center gap-1"
+              >
+                {meetupsExpanded ? "Collapse" : "See all"}
+                <svg xmlns="http://www.w3.org/2000/svg" className={`w-3.5 h-3.5 transition-transform ${meetupsExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
           <div className="bg-[#E0D9C8] rounded-2xl border border-[rgba(92,51,23,0.12)] p-4 flex flex-col gap-3">
-            {meetups.length === 0 ? (
+            {meetups.length === 0 && pastMeetups.length === 0 ? (
               <div className="flex items-center gap-2">
                 <div className="w-1 h-8 bg-[#5C3317] rounded-full"/>
                 <div>
@@ -218,37 +260,51 @@ function HomePage() {
                   <div className="text-xs text-[#7A6A55]">Connect with kakis to plan one!</div>
                 </div>
               </div>
+            ) : !meetupsExpanded ? (
+              /* COLLAPSED: show only upcoming (or a hint if none upcoming) */
+              meetups.length === 0 ? (
+                <div className="text-xs text-[#7A6A55]">No upcoming meet-ups. Tap "See all" to view past sessions.</div>
+              ) : (
+                meetups.map((m) => (
+                  <MeetupRow key={m.id} m={m} respondMeetup={respondMeetup} fmtDay={fmtDay} fmtTime={fmtTime} />
+                ))
+              )
             ) : (
-              meetups.map((m) => (
-                <div key={m.id} className="flex items-start gap-3">
-                  <div className="w-1 self-stretch bg-[#5C3317] rounded-full min-h-[2.5rem]"/>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-semibold text-[#3A2410]">{m.title}</div>
-                      <div className="text-xs font-medium text-[#3A2410] whitespace-nowrap">
-                        {fmtDay(m.meet_at)} · {fmtTime(m.meet_at)}
-                      </div>
-                    </div>
-                    <div className="text-xs text-[#7A6A55]">
-                      with {m.otherName}{m.location ? ` · ${m.location}` : ""}
-                    </div>
-
-                    {/* Status / actions */}
-                    {m.status === "pending" && m.isInvitee ? (
-                      <div className="flex gap-2 mt-2">
-                        <button onClick={() => respondMeetup(m, true)} className="flex-1 bg-[#C8D8C0] text-[#274020] rounded-full py-1.5 text-xs font-semibold">Accept</button>
-                        <button onClick={() => respondMeetup(m, false)} className="flex-1 bg-[#D98A8A] text-[#5c1f1f] rounded-full py-1.5 text-xs font-semibold">Decline</button>
-                      </div>
-                    ) : m.status === "pending" ? (
-                      <div className="text-[11px] text-[#7A6A55] mt-1 italic">Waiting for {m.otherName} to respond…</div>
-                    ) : m.status === "accepted" ? (
-                      <span className="inline-block mt-1.5 bg-[#C8D8C0] text-[#274020] text-[10px] font-medium px-2 py-0.5 rounded-full">Confirmed ✓</span>
-                    ) : (
-                      <span className="inline-block mt-1.5 bg-[#E0D0D0] text-[#7a3030] text-[10px] font-medium px-2 py-0.5 rounded-full">Declined</span>
-                    )}
-                  </div>
+              /* EXPANDED: list <-> calendar toggle */
+              <>
+                <div className="flex gap-1 bg-[#EDE8DC] rounded-full p-1 self-start">
+                  <button onClick={() => setMeetupView("list")} className={`px-3 py-1 rounded-full text-xs font-medium ${meetupView === "list" ? "bg-[#5C3317] text-[#FAF6EF]" : "text-[#7A6A55]"}`}>List</button>
+                  <button onClick={() => setMeetupView("calendar")} className={`px-3 py-1 rounded-full text-xs font-medium ${meetupView === "calendar" ? "bg-[#5C3317] text-[#FAF6EF]" : "text-[#7A6A55]"}`}>Calendar</button>
                 </div>
-              ))
+
+                {meetupView === "list" ? (
+                  <>
+                    {meetups.length > 0 && (
+                      <>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-[#7A6A55] mt-1">Upcoming</div>
+                        {meetups.map((m) => (
+                          <MeetupRow key={m.id} m={m} respondMeetup={respondMeetup} fmtDay={fmtDay} fmtTime={fmtTime} />
+                        ))}
+                      </>
+                    )}
+                    {pastMeetups.length > 0 && (
+                      <>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-[#7A6A55] mt-2">Past</div>
+                        {pastMeetups.map((m) => (
+                          <MeetupRow key={m.id} m={m} respondMeetup={respondMeetup} fmtDay={fmtDay} fmtTime={fmtTime} past />
+                        ))}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <MeetupCalendar
+                    month={calMonth}
+                    setMonth={setCalMonth}
+                    meetups={[...meetups, ...pastMeetups]}
+                    fmtTime={fmtTime}
+                  />
+                )}
+              </>
             )}
           </div>
         </section>
@@ -302,6 +358,153 @@ function HomePage() {
       </main>
 
       <BottomNav active="home" />
+    </div>
+  );
+}
+
+// A single meet-up row (used in both collapsed and expanded views)
+function MeetupRow({ m, respondMeetup, fmtDay, fmtTime, past }: {
+  m: Meetup;
+  respondMeetup: (m: Meetup, accept: boolean) => void;
+  fmtDay: (iso: string) => string;
+  fmtTime: (iso: string) => string;
+  past?: boolean;
+}) {
+  return (
+    <div className={`flex items-start gap-3 ${past ? "opacity-60" : ""}`}>
+      <div className="w-1 self-stretch bg-[#5C3317] rounded-full min-h-[2.5rem]"/>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-sm font-semibold text-[#3A2410]">{m.title}</div>
+          <div className="text-xs font-medium text-[#3A2410] whitespace-nowrap">
+            {fmtDay(m.meet_at)} · {fmtTime(m.meet_at)}
+          </div>
+        </div>
+        <div className="text-xs text-[#7A6A55]">
+          with {m.otherName}{m.location ? ` · ${m.location}` : ""}
+        </div>
+
+        {/* Status / actions — only interactive for upcoming */}
+        {!past && m.status === "pending" && m.isInvitee ? (
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => respondMeetup(m, true)} className="flex-1 bg-[#C8D8C0] text-[#274020] rounded-full py-1.5 text-xs font-semibold">Accept</button>
+            <button onClick={() => respondMeetup(m, false)} className="flex-1 bg-[#D98A8A] text-[#5c1f1f] rounded-full py-1.5 text-xs font-semibold">Decline</button>
+          </div>
+        ) : m.status === "pending" ? (
+          <div className="text-[11px] text-[#7A6A55] mt-1 italic">{past ? "No response" : `Waiting for ${m.otherName} to respond…`}</div>
+        ) : m.status === "accepted" ? (
+          <span className="inline-block mt-1.5 bg-[#C8D8C0] text-[#274020] text-[10px] font-medium px-2 py-0.5 rounded-full">{past ? "Attended ✓" : "Confirmed ✓"}</span>
+        ) : (
+          <span className="inline-block mt-1.5 bg-[#E0D0D0] text-[#7a3030] text-[10px] font-medium px-2 py-0.5 rounded-full">Declined</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// A simple monthly calendar grid with dots on days that have meet-ups
+function MeetupCalendar({ month, setMonth, meetups, fmtTime }: {
+  month: Date;
+  setMonth: (d: Date) => void;
+  meetups: Meetup[];
+  fmtTime: (iso: string) => string;
+}) {
+  const year = month.getFullYear();
+  const mon = month.getMonth();
+  const firstDay = new Date(year, mon, 1).getDay(); // 0 = Sun
+  const daysInMonth = new Date(year, mon + 1, 0).getDate();
+  const monthLabel = month.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+  // Map day-of-month -> meet-ups on that day (this month only)
+  const byDay = new Map<number, Meetup[]>();
+  meetups.forEach((m) => {
+    const d = new Date(m.meet_at);
+    if (d.getFullYear() === year && d.getMonth() === mon) {
+      const day = d.getDate();
+      byDay.set(day, [...(byDay.get(day) ?? []), m]);
+    }
+  });
+
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const todayObj = new Date();
+  const isToday = (d: number) => todayObj.getFullYear() === year && todayObj.getMonth() === mon && todayObj.getDate() === d;
+
+  const prevMonth = () => { setSelectedDay(null); setMonth(new Date(year, mon - 1, 1)); };
+  const nextMonth = () => { setSelectedDay(null); setMonth(new Date(year, mon + 1, 1)); };
+
+  const selectedMeetups = selectedDay ? (byDay.get(selectedDay) ?? []) : [];
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Month nav */}
+      <div className="flex items-center justify-between">
+        <button onClick={prevMonth} className="text-[#5C3317] p-1">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <span className="text-sm font-semibold text-[#3A2410]">{monthLabel}</span>
+        <button onClick={nextMonth} className="text-[#5C3317] p-1">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+          <div key={i} className="text-[10px] font-medium text-[#7A6A55] py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Day cells */}
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, i) => {
+          if (d === null) return <div key={`e${i}`} />;
+          const has = byDay.has(d);
+          const sel = selectedDay === d;
+          return (
+            <button
+              key={d}
+              onClick={() => setSelectedDay(sel ? null : (has ? d : null))}
+              className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs relative
+                ${sel ? "bg-[#5C3317] text-[#FAF6EF]" : isToday(d) ? "bg-[#D3C4A8] text-[#3A2410]" : "text-[#3A2410]"}
+                ${has && !sel ? "font-bold" : ""}`}
+            >
+              {d}
+              {has && (
+                <span className={`w-1 h-1 rounded-full absolute bottom-1 ${sel ? "bg-[#FAF6EF]" : "bg-[#5C3317]"}`} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected day details */}
+      {selectedDay && (
+        <div className="mt-1 border-t border-[rgba(92,51,23,0.12)] pt-2 flex flex-col gap-2">
+          {selectedMeetups.length === 0 ? (
+            <div className="text-xs text-[#7A6A55]">No meet-ups this day.</div>
+          ) : (
+            selectedMeetups.map((m) => (
+              <div key={m.id} className="flex items-center gap-2">
+                <div className="w-1 h-6 bg-[#5C3317] rounded-full" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-[#3A2410]">{m.title} · {fmtTime(m.meet_at)}</div>
+                  <div className="text-[11px] text-[#7A6A55]">with {m.otherName}{m.location ? ` · ${m.location}` : ""}</div>
+                </div>
+                <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${
+                  m.status === "accepted" ? "bg-[#C8D8C0] text-[#274020]"
+                  : m.status === "declined" ? "bg-[#E0D0D0] text-[#7a3030]"
+                  : "bg-[#EDE1C8] text-[#7a5a20]"}`}>
+                  {m.status === "accepted" ? "✓" : m.status === "declined" ? "✕" : "…"}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,203 +1,265 @@
-// Standardised list of common NUS undergraduate courses.
-// Add more as needed — keep values consistent so filtering works.
+// NUS course list, faculty mapping, and forgiving search.
+// courseMatchesQuery lets people type "CS" and match "Computer Science", etc.
 
 export const NUS_COURSES = [
-  // Computing
   "Computer Science",
   "Business Analytics",
   "Information Systems",
   "Information Security",
+  "Business Artificial Intelligence Systems",
   "Computer Engineering",
-  // Business
+  "Data Science and Analytics",
   "Business Administration",
-  "Business Administration (Accountancy)",
-  "Real Estate",
-  // Engineering
-  "Biomedical Engineering",
+  "Accountancy",
+  "Economics",
+  "Mechanical Engineering",
+  "Electrical Engineering",
   "Chemical Engineering",
   "Civil Engineering",
-  "Electrical Engineering",
-  "Industrial & Systems Engineering",
-  "Mechanical Engineering",
-  "Materials Science & Engineering",
-  "Environmental Engineering",
-  // Science
-  "Life Sciences",
-  "Chemistry",
-  "Physics",
+  "Biomedical Engineering",
+  "Industrial and Systems Engineering",
+  "Materials Science and Engineering",
   "Mathematics",
+  "Applied Mathematics",
   "Statistics",
-  "Data Science & Analytics",
+  "Physics",
+  "Chemistry",
+  "Life Sciences",
   "Pharmacy",
   "Pharmaceutical Science",
-  "Food Science & Technology",
-  // FASS
-  "Economics",
-  "Psychology",
-  "Political Science",
-  "Sociology",
-  "History",
-  "English Literature",
-  "Communications & New Media",
-  "Geography",
-  "Philosophy",
-  "Social Work",
-  // Others
-  "Law",
   "Medicine",
-  "Dentistry",
   "Nursing",
+  "Dentistry",
+  "Law",
   "Architecture",
   "Industrial Design",
+  "Project and Facilities Management",
+  "Real Estate",
+  "Political Science",
+  "Psychology",
+  "Sociology",
+  "History",
+  "Geography",
+  "English Literature",
+  "English Language",
+  "Communications and New Media",
+  "Philosophy",
+  "Social Work",
+  "Chinese Studies",
+  "Malay Studies",
+  "South Asian Studies",
+  "Global Studies",
   "Music",
-  "Data Science & Economics",
-  "Philosophy, Politics & Economics (PPE)",
   "Environmental Studies",
-  "Other",
-] as const;
+  "Food Science and Technology",
+  "Data Science and Economics",
+];
 
-// Map a course to its faculty (for the faculty filter chips)
+// Map each course to a faculty (used elsewhere if needed).
 export const COURSE_TO_FACULTY: Record<string, string> = {
   "Computer Science": "Computing",
   "Business Analytics": "Computing",
   "Information Systems": "Computing",
   "Information Security": "Computing",
   "Computer Engineering": "Computing",
+  "Data Science and Analytics": "Science",
   "Business Administration": "Business",
-  "Business Administration (Accountancy)": "Business",
-  "Real Estate": "Business",
-  "Biomedical Engineering": "Engineering",
+  "Accountancy": "Business",
+  "Economics": "Arts & Social Sciences",
+  "Mechanical Engineering": "Engineering",
+  "Electrical Engineering": "Engineering",
   "Chemical Engineering": "Engineering",
   "Civil Engineering": "Engineering",
-  "Electrical Engineering": "Engineering",
-  "Industrial & Systems Engineering": "Engineering",
-  "Mechanical Engineering": "Engineering",
-  "Materials Science & Engineering": "Engineering",
-  "Environmental Engineering": "Engineering",
-  "Life Sciences": "Science",
-  "Chemistry": "Science",
-  "Physics": "Science",
+  "Biomedical Engineering": "Engineering",
+  "Industrial and Systems Engineering": "Engineering",
+  "Materials Science and Engineering": "Engineering",
   "Mathematics": "Science",
+  "Applied Mathematics": "Science",
   "Statistics": "Science",
-  "Data Science & Analytics": "Science",
+  "Physics": "Science",
+  "Chemistry": "Science",
+  "Life Sciences": "Science",
   "Pharmacy": "Science",
   "Pharmaceutical Science": "Science",
-  "Food Science & Technology": "Science",
-  "Economics": "FASS",
-  "Psychology": "FASS",
-  "Political Science": "FASS",
-  "Sociology": "FASS",
-  "History": "FASS",
-  "English Literature": "FASS",
-  "Communications & New Media": "FASS",
-  "Geography": "FASS",
-  "Philosophy": "FASS",
-  "Social Work": "FASS",
-  "Law": "Law",
   "Medicine": "Medicine",
-  "Dentistry": "Dentistry",
-  "Nursing": "Nursing",
+  "Nursing": "Medicine",
+  "Dentistry": "Medicine",
+  "Law": "Law",
   "Architecture": "Design & Environment",
   "Industrial Design": "Design & Environment",
+  "Project and Facilities Management": "Design & Environment",
+  "Real Estate": "Design & Environment",
   "Music": "Music",
 };
 
-// Common abbreviations / alternate spellings -> standard course name.
-// Used to make search forgiving and to normalise messy free-text data.
+// Common abbreviations / alternate spellings people might type.
+// Keys are lowercase search terms, values are the canonical course name.
 export const COURSE_ALIASES: Record<string, string> = {
+  // ---- Computing (School of Computing) ----
+  // Official module prefixes: CS, IS, BT, CP
   "cs": "Computer Science",
   "comp sci": "Computer Science",
   "compsci": "Computer Science",
-  "computer sci": "Computer Science",
-  "bza": "Business Analytics",
-  "ba": "Business Analytics",
-  "biz analytics": "Business Analytics",
-  "business analytics": "Business Analytics",
+  "comp science": "Computer Science",
   "is": "Information Systems",
   "infosys": "Information Systems",
-  "info sys": "Information Systems",
+  "info systems": "Information Systems",
+  "isec": "Information Security",
   "infosec": "Information Security",
-  "ceg": "Computer Engineering",
-  "comp eng": "Computer Engineering",
+  "info security": "Information Security",
+  "bt": "Business Analytics",       // BT is the official module prefix for Business Analytics
+  "bza": "Business Analytics",      // BZA is the colloquial NUS programme abbreviation
+  "biz analytics": "Business Analytics",
+  "business analytics": "Business Analytics",
+  "bais": "Business Artificial Intelligence Systems",
+  "business ai": "Business Artificial Intelligence Systems",
+
+  // ---- Business (NUS Business School) ----
   "bba": "Business Administration",
+  "ba": "Business Administration",
   "biz": "Business Administration",
+  "biz admin": "Business Administration",
   "business": "Business Administration",
-  "acc": "Business Administration (Accountancy)",
-  "accountancy": "Business Administration (Accountancy)",
-  "accounting": "Business Administration (Accountancy)",
-  "eee": "Electrical Engineering",
-  "ee": "Electrical Engineering",
-  "mech eng": "Mechanical Engineering",
+  "acc": "Accountancy",
+  "acct": "Accountancy",
+  "accounting": "Accountancy",
+
+  // ---- Engineering (College of Design and Engineering) ----
+  "ceg": "Computer Engineering",    // official CEG programme code
+  "comp eng": "Computer Engineering",
   "me": "Mechanical Engineering",
-  "civil": "Civil Engineering",
+  "mech eng": "Mechanical Engineering",
+  "mech": "Mechanical Engineering",
+  "ee": "Electrical Engineering",   // EE is the official module prefix
+  "elec eng": "Electrical Engineering",
+  "cheme": "Chemical Engineering",
   "chem eng": "Chemical Engineering",
-  "biomed": "Biomedical Engineering",
+  "ce": "Civil Engineering",
+  "civil eng": "Civil Engineering",
   "bme": "Biomedical Engineering",
-  "ise": "Industrial & Systems Engineering",
-  "life sci": "Life Sciences",
-  "lsm": "Life Sciences",
-  "ls": "Life Sciences",
-  "chem": "Chemistry",
-  "phys": "Physics",
+  "biomed": "Biomedical Engineering",
+  "ise": "Industrial and Systems Engineering",
+  "mls": "Materials Science and Engineering",
+  "mse": "Materials Science and Engineering",
+
+  // ---- Science (Faculty of Science / CHS) ----
+  "ma": "Mathematics",              // MA is the official module prefix
   "math": "Mathematics",
   "maths": "Mathematics",
+  "am": "Applied Mathematics",
+  "applied math": "Applied Mathematics",
+  "st": "Statistics",               // ST is the official module prefix
   "stats": "Statistics",
-  "dsa": "Data Science & Analytics",
-  "data sci": "Data Science & Analytics",
-  "econs": "Economics",
-  "econ": "Economics",
-  "psych": "Psychology",
-  "polsci": "Political Science",
-  "pol sci": "Political Science",
-  "soc": "Sociology",
-  "comms": "Communications & New Media",
-  "cnm": "Communications & New Media",
-  "geog": "Geography",
-  "philo": "Philosophy",
-  "ppe": "Philosophy, Politics & Economics (PPE)",
-  "law": "Law",
-  "med": "Medicine",
-  "medicine": "Medicine",
-  "nursing": "Nursing",
-  "arch": "Architecture",
+  "dsa": "Data Science and Analytics",
+  "data science": "Data Science and Analytics",
+  "phy": "Physics",
+  "phys": "Physics",
+  "cm": "Chemistry",
+  "chem": "Chemistry",
+  "ls": "Life Sciences",
+  "lsm": "Life Sciences",
+  "life sci": "Life Sciences",
   "pharm": "Pharmacy",
+  "fst": "Food Science and Technology",
+  "food sci": "Food Science and Technology",
+
+  // ---- Medicine ----
+  "med": "Medicine",
+  "mbbs": "Medicine",
+  "nur": "Nursing",
+  "nursing": "Nursing",
+  "dent": "Dentistry",
+  "dentistry": "Dentistry",
+
+  // ---- Law ----
+  "law": "Law",
+  "llb": "Law",
+
+  // ---- Design & Environment (CDE) ----
+  "arch": "Architecture",
+  "archi": "Architecture",
+  "did": "Industrial Design",
+  "id": "Industrial Design",
+  "pfm": "Project and Facilities Management",
+  "re": "Real Estate",
+
+  // ---- Arts & Social Sciences (FASS / CHS) ----
+  "econ": "Economics",
+  "econs": "Economics",
+  "ec": "Economics",
+  "ps": "Political Science",
+  "poli sci": "Political Science",
+  "polsci": "Political Science",
+  "psy": "Psychology",
+  "psych": "Psychology",
+  "psycho": "Psychology",
+  "soc": "Sociology",
+  "socio": "Sociology",
+  "hist": "History",
+  "geog": "Geography",
+  "el": "English Language",
+  "ell": "English Language",
+  "en": "English Literature",
+  "eng lit": "English Literature",
+  "lit": "English Literature",
+  "cnm": "Communications and New Media",
+  "comms": "Communications and New Media",
+  "phil": "Philosophy",
+  "philo": "Philosophy",
+  "sw": "Social Work",
+  "socwork": "Social Work",
+  "gl": "Global Studies",
+  "global": "Global Studies",
+
+  // ---- Music (YST) ----
+  "mus": "Music",
+  "music": "Music",
+
+  // ---- Environment ----
+  "ens": "Environmental Studies",
+  "env": "Environmental Studies",
 };
 
-// Normalise any course string (typed or stored) to a standard course name.
-// Falls back to the original (trimmed) value if no match is found.
-export function normaliseCourse(raw: string): string {
-  if (!raw) return "";
-  const trimmed = raw.trim();
-  const lower = trimmed.toLowerCase();
-
-  // Exact alias match
-  if (COURSE_ALIASES[lower]) return COURSE_ALIASES[lower];
-
-  // Exact standard-name match (case-insensitive)
-  const exact = NUS_COURSES.find((c) => c.toLowerCase() === lower);
-  if (exact) return exact;
-
-  // Otherwise keep what they typed (capitalised as-is)
-  return trimmed;
+// Normalise a course string for comparison (lowercase, collapse spaces).
+export function normaliseCourse(value: string | null | undefined): string {
+  return (value ?? "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-// For search: does this profile's course match the query, allowing for
-// aliases and partial matches in both directions?
-export function courseMatchesQuery(course: string | null, query: string): boolean {
-  if (!query) return true;
-  if (!course) return false;
+// Does a profile's course match what the user typed?
+// Designed to be forgiving ("cs" finds Computer Science) without false
+// positives ("cs" must NOT match Business Analytics just because
+// "analytiCS" contains the letters "cs").
+export function courseMatchesQuery(
+  course: string | null | undefined,
+  query: string
+): boolean {
+  const q = normaliseCourse(query);
+  if (!q) return true;                // empty search shows everyone
 
-  const q = query.trim().toLowerCase();
-  const normalisedCourse = normaliseCourse(course).toLowerCase();
-  const rawCourse = course.toLowerCase();
+  const c = normaliseCourse(course);
+  if (!c) return false;               // profile has no course set
 
-  // If the query is an alias, also match its expanded form
-  const expandedQuery = (COURSE_ALIASES[q] ?? query).toLowerCase();
+  const courseWords = c.split(" ");
 
-  return (
-    normalisedCourse.includes(q) ||
-    rawCourse.includes(q) ||
-    normalisedCourse.includes(expandedQuery) ||
-    rawCourse.includes(expandedQuery)
-  );
+  // 1. Any word in the course starts with the query.
+  //    "comp" -> Computer Science, "econ" -> Economics, "analytics" -> Business Analytics.
+  //    This deliberately avoids mid-word matches like "cs" inside "analytics".
+  if (courseWords.some((w) => w.startsWith(q))) return true;
+
+  // 2. Multi-word query: allow a full substring, which is specific enough
+  //    to be safe. "data science" -> Data Science and Analytics.
+  if (q.includes(" ") && c.includes(q)) return true;
+
+  // 3. The query is a known abbreviation for this exact course.
+  //    "cs" -> Computer Science, "ba" -> Business Analytics, "is" -> Information Systems.
+  const aliasTarget = COURSE_ALIASES[q];
+  if (aliasTarget && normaliseCourse(aliasTarget) === c) return true;
+
+  // 4. Typing part of the full name that an alias expands to.
+  if (aliasTarget) {
+    const targetWords = normaliseCourse(aliasTarget).split(" ");
+    if (targetWords.some((w) => w.startsWith(q))) return true;
+  }
+
+  return false;
 }
