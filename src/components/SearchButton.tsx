@@ -32,6 +32,7 @@ export function SearchButton() {
       .from("profiles")
       .select("id, display_name, course, year_of_study, study_style, current_modules")
       .neq("id", session.user.id)
+      .eq("is_discoverable", true)
       .not("course", "is", null)
       .limit(100)
       .then(({ data }) => {

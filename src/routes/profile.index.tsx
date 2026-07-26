@@ -32,6 +32,7 @@ function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [showBlocked, setShowBlocked] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
 
@@ -135,6 +136,7 @@ function ProfilePage() {
         <div className="bg-[#E0D9C8] rounded-2xl border border-[rgba(92,51,23,0.12)] overflow-hidden">
           <SettingsRow icon={<UserIcon />} label="Edit profile" onClick={() => navigate({ to: "/profile/edit" })} />
           <SettingsRow icon={<BellIcon />} label="Notification preferences" onClick={() => setShowNotifs(true)} />
+          <SettingsRow icon={<ShieldIcon />} label="Profile visibility" onClick={() => setShowPrivacy(true)} />
           <SettingsRow icon={<BlockIcon />} label="Blocked users" onClick={() => setShowBlocked(true)} />
           <SettingsRow icon={<FlagIcon />} label="Report a user" onClick={() => setShowReport(true)} />
           <SettingsRow icon={<InfoIcon />} label="About & Help" onClick={() => setShowAbout(true)} last />
@@ -150,6 +152,7 @@ function ProfilePage() {
 
       {showReport && <ReportModal onClose={() => setShowReport(false)} userId={session!.user.id} />}
       {showNotifs && <NotifPrefsModal onClose={() => setShowNotifs(false)} userId={session!.user.id} />}
+      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} userId={session!.user.id} />}
       {showBlocked && <BlockedUsersModal onClose={() => setShowBlocked(false)} userId={session!.user.id} />}
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
 
@@ -297,6 +300,50 @@ function NotifPrefsModal({ onClose, userId }: { onClose: () => void; userId: str
   );
 }
 
+function PrivacyModal({ onClose, userId }: { onClose: () => void; userId: string }) {
+  const [discoverable, setDiscoverable] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    supabase.from("profiles").select("is_discoverable").eq("id", userId).single()
+      .then(({ data, error }) => {
+        if (error) toast.error(error.message);
+        setDiscoverable(data?.is_discoverable ?? true);
+        setLoaded(true);
+      });
+  }, [userId]);
+
+  const toggleDiscoverability = async () => {
+    const next = !discoverable;
+    setDiscoverable(next);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_discoverable: next })
+      .eq("id", userId);
+    if (error) {
+      setDiscoverable(!next);
+      toast.error(error.message);
+    }
+  };
+
+  return (
+    <SheetShell title="Profile visibility" subtitle="Control whether new people can find you." onClose={onClose}>
+      {loaded && (
+        <>
+          <div className="flex items-center justify-between bg-[#E0D9C8] rounded-xl px-4 py-3">
+            <div>
+              <div className="text-sm font-medium text-[#3A2410]">Appear in Kaki discovery</div>
+              <p className="text-xs text-[#7A6A55] mt-0.5">Show your profile in Find Kakis, suggestions, searches, and bidding matches.</p>
+            </div>
+            <Toggle on={discoverable} onToggle={toggleDiscoverability} />
+          </div>
+          <p className="text-[11px] text-[#7A6A55]">Turning this off does not remove existing kakis or pending requests.</p>
+        </>
+      )}
+    </SheetShell>
+  );
+}
+
 type BlockedRow = { id: string; blocked_id: string; name: string };
 
 function BlockedUsersModal({ onClose, userId }: { onClose: () => void; userId: string }) {
@@ -372,7 +419,6 @@ function AboutModal({ onClose }: { onClose: () => void }) {
 const inp = "w-full rounded-xl border border-[rgba(92,51,23,0.2)] bg-[#E0D9C8] px-4 py-2.5 text-sm text-[#3A2410] placeholder:text-[#7A6A55] outline-none focus:ring-2 focus:ring-[#5C3317]/30";
 
 function UserIcon() { return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>; }
-function LockIcon() { return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>; }
 function ShieldIcon() { return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>; }
 function FlagIcon() { return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 21V4m0 0l9-2 9 2v13l-9-2-9 2V4z"/></svg>; }
 function BellIcon() { return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>; }

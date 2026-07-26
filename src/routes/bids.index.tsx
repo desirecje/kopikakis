@@ -18,6 +18,7 @@ type Profile = {
   display_name: string | null;
   course: string | null;
   year_of_study: string | null;
+  is_discoverable: boolean;
 };
 
 type MatchedKaki = {
@@ -67,7 +68,7 @@ function BidsPage() {
     const otherIds = [...new Set(others.map((o) => o.user_id))];
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, display_name, course, year_of_study")
+      .select("id, display_name, course, year_of_study, is_discoverable")
       .in("id", otherIds);
     const profileMap = new Map((profiles ?? []).map((p) => [p.id, p as Profile]));
 
@@ -89,6 +90,7 @@ function BidsPage() {
       .map((o) => {
         const profile = profileMap.get(o.user_id);
         if (!profile) return null;
+        if (!profile.is_discoverable && !connectedIds.has(o.user_id)) return null;
         return {
           profile,
           module_code: o.module_code,

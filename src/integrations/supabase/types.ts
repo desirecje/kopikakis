@@ -22,6 +22,7 @@ export type Database = {
           gender_preference: string | null
           bio: string | null
           telegram_handle: string | null
+          is_discoverable: boolean
           created_at: string
           updated_at: string
         }
@@ -37,6 +38,7 @@ export type Database = {
           gender_preference?: string | null
           bio?: string | null
           telegram_handle?: string | null
+          is_discoverable?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -52,6 +54,7 @@ export type Database = {
           gender_preference?: string | null
           bio?: string | null
           telegram_handle?: string | null
+          is_discoverable?: boolean
           created_at?: string
           updated_at?: string
         }

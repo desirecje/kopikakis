@@ -27,6 +27,7 @@ type Profile = {
   telegram_handle: string | null;
   bio: string | null;
   current_modules: string[] | null;
+  is_discoverable: boolean;
 };
 
 type BuddyRequest = {
@@ -64,7 +65,7 @@ function KakisPage() {
 
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, display_name, course, faculty, year_of_study, accommodation, study_style, telegram_handle, bio, current_modules")
+      .select("id, display_name, course, faculty, year_of_study, accommodation, study_style, telegram_handle, bio, current_modules, is_discoverable")
       .neq("id", uid)
       .not("course", "is", null);
 
@@ -177,6 +178,7 @@ function KakisPage() {
 
   const filtered = allProfiles
     .filter((p) => !connectedIds.has(p.id))            // hide people you're already kakis with
+    .filter((p) => p.is_discoverable)                  // only discoverable people appear in Find Kakis
     .filter((p) => courseMatchesQuery(p.course, courseQuery));
 
   const sharedModules = (p: Profile) => {

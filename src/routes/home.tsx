@@ -93,6 +93,7 @@ function HomePage() {
       .from("profiles")
       .select("id, display_name, course, year_of_study, accommodation, study_style")
       .neq("id", uid)
+      .eq("is_discoverable", true)
       .not("course", "is", null)
       .limit(20);
 
